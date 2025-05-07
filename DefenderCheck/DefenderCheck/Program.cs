@@ -37,40 +37,50 @@ namespace DefenderCheck
                 Console.WriteLine("[+] No threat found in submitted file!");
                 return;
             }
+            Console.WriteLine($"原文件扫描结果:{originalFileDetectionStatus}");
             
             if (!Directory.Exists(@"C:\Temp"))
             {
                 Console.WriteLine(@"[-] C:\Temp doesn't exist. Creating it...");
                 Directory.CreateDirectory(@"C:\Temp");
             }
-                   
-            string testfilepath = @"C:\Temp\testfile.exe";
+
             byte[] originalfilecontents = File.ReadAllBytes(targetfile);
             int originalfilesize = originalfilecontents.Length;
-            Console.WriteLine("Target file size: {0} bytes", originalfilecontents.Length);
+            Console.WriteLine("Target file size: {0} bytes", originalfilesize);
             Console.WriteLine("Analyzing...\n");
 
-            byte[] splitarray1 = new byte[originalfilesize/2];
-            Buffer.BlockCopy(originalfilecontents, 0, splitarray1, 0, originalfilecontents.Length / 2);
+            byte[] splitarray1 = new byte[originalfilesize / 2];
+            Buffer.BlockCopy(originalfilecontents, 0, splitarray1, 0, splitarray1.Length);
+
             int lastgood = 0;
+            int fileIndex = 0;
+
+            string timestampPrefix = Path.GetFileNameWithoutExtension(targetfile) + DateTime.Now.ToString("yyyyMMdd-HHmm");
+            string ext = Path.GetExtension(targetfile);
 
             while (true)
             {
-                if (debug) { Console.WriteLine("Testing {0} bytes", splitarray1.Length); }
+                string testfilepath = $@"C:\Temp\{timestampPrefix}-{fileIndex}.{ext}";
+                fileIndex++;
+
+                Console.WriteLine($"Testing {splitarray1.Length} bytes -> {Path.GetFileName(testfilepath)}");
                 File.WriteAllBytes(testfilepath, splitarray1);
+
                 string detectionStatus = Scan(testfilepath).ToString();
+
                 if (detectionStatus.Equals("ThreatFound"))
                 {
-                    if (debug) { Console.WriteLine("Threat found. Halfsplitting again..."); }
+                    Console.WriteLine("Threat found. Halfsplitting again...");
                     byte[] temparray = HalfSplitter(splitarray1, lastgood);
                     Array.Resize(ref splitarray1, temparray.Length);
                     Array.Copy(temparray, splitarray1, temparray.Length);
                 }
                 else if (detectionStatus.Equals("NoThreatFound"))
                 {
-                    if (debug) { Console.WriteLine("No threat found. Going up 50% of current size."); };
+                    Console.WriteLine("No threat found. Going up 50% of current size.");
                     lastgood = splitarray1.Length;
-                    byte[] temparray = Overshot(originalfilecontents, splitarray1.Length); //Create temp array with 1.5x more bytes
+                    byte[] temparray = Overshot(originalfilecontents, splitarray1.Length);
                     Array.Resize(ref splitarray1, temparray.Length);
                     Buffer.BlockCopy(temparray, 0, splitarray1, 0, temparray.Length);
                 }
